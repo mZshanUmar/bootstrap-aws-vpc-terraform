@@ -1,9 +1,9 @@
 # Terraform AWS VPC
 
 A variable-driven Terraform template for an AWS VPC with configurable public and
-private subnets. Each subnet gets its own route table. An internet gateway and
-default internet routes are created only when at least one public subnet is
-configured.
+private subnets. Each subnet gets its own route table. Public subnets get
+internet-gateway routes; Regional NAT mode also creates an internet gateway
+when no public subnets are configured.
 
 ## Requirements
 
@@ -38,14 +38,21 @@ private_subnets = {
 Add or remove entries in either subnet map to control the number of subnets.
 Each map key becomes the subnet's `Name` tag; set its CIDR and availability
 zone in the value. Set either map to `{}` to create no subnets of that type.
-When `public_subnets` is empty, no internet gateway is created.
+An internet gateway is created when public subnets exist or Regional NAT mode
+is selected.
 
 Public subnets receive a default route to the internet gateway and assign public
-IPv4 addresses on launch. Each private subnet has its own route table with no
-internet default route; this template does not create NAT gateways.
+IPv4 addresses on launch. Each private subnet has its own route table and no
+internet default route unless NAT gateways are enabled.
 
-Optional variables include `enable_dns_support`, `enable_dns_hostnames`, and
-`tags`. See `variables.tf` for defaults and descriptions.
+Set `nat_gateway_mode` to `None` (default), `Zonal`, or `Regional` to control
+private-subnet internet access. `Zonal` creates a NAT gateway in each AZ that
+has private subnets and requires a public subnet in each such AZ. `Regional`
+creates one native AWS Regional NAT Gateway. NAT gateways incur hourly and
+data-processing charges. Set `enable_s3_endpoint = true` to add an S3 gateway
+endpoint to the private route tables; it requires at least one private subnet.
+Optional variables also include `enable_dns_support`, `enable_dns_hostnames`,
+and `tags`. See `variables.tf` for defaults and descriptions.
 
 ## Deploy
 
@@ -79,6 +86,10 @@ Set either subnet input to `{}` to omit that subnet type. The `apply` action use
 the `vpc-deploy` GitHub Environment; configure required reviewers for that
 environment to gate deployments. The `plan` action uses `vpc-plan` and does not
 require approval by default.
+
+Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode and whether to
+create an S3 gateway endpoint in the workflow inputs. NAT gateways can incur
+significant charges; `None` is the default.
 
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
 trusted for GitHub Actions OIDC. Grant that role only the AWS permissions needed

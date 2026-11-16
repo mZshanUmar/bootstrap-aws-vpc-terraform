@@ -50,6 +50,23 @@ variable "private_subnets" {
   }
 }
 
+variable "nat_gateway_mode" {
+  description = "NAT gateway availability mode: None, Zonal, or Regional."
+  type        = string
+  default     = "None"
+
+  validation {
+    condition     = contains(["None", "Zonal", "Regional"], var.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be None, Zonal, or Regional."
+  }
+}
+
+variable "enable_s3_endpoint" {
+  description = "Create an S3 gateway VPC endpoint associated with private route tables."
+  type        = bool
+  default     = false
+}
+
 variable "enable_dns_support" {
   description = "Enable DNS resolution in the VPC."
   type        = bool

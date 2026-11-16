@@ -24,22 +24,36 @@ on:
         type: string
         required: true
       public_subnets:
-        description: Public subnets as a JSON object; use {} for none
+        description: Public subnet JSON example uses us-east-1a/b; use {} for none
         type: string
-        default: "{}"
+        default: '{"public-a":{"cidr_block":"10.0.1.0/24","availability_zone":"us-east-1a"},"public-b":{"cidr_block":"10.0.2.0/24","availability_zone":"us-east-1b"}}'
         required: true
       private_subnets:
         description: Private subnets as a JSON object; use {} for none
         type: string
         default: "{}"
         required: true
+      nat_gateway_mode:
+        description: NAT gateways incur hourly and data processing costs
+        type: choice
+        options:
+          - None
+          - Zonal
+          - Regional
+        default: None
+        required: true
+      enable_s3_endpoint:
+        description: Create an S3 gateway endpoint for private subnets
+        type: boolean
+        default: false
+        required: true
       enable_dns_support:
-        description: Enable VPC DNS support
+        description: Enable VPC DNS support (Whether the VPC supports DNS resolution using the Amazon-provided resolver)
         type: boolean
         default: true
         required: true
       enable_dns_hostnames:
-        description: Enable VPC DNS hostnames
+        description: Enable VPC DNS hostnames (Whether instances in the VPC are assigned DNS hostnames)
         type: boolean
         default: true
         required: true
@@ -70,6 +84,8 @@ jobs:
       AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
       PUBLIC_SUBNETS_JSON: ${{ inputs.public_subnets }}
       PRIVATE_SUBNETS_JSON: ${{ inputs.private_subnets }}
+      NAT_GATEWAY_MODE: ${{ inputs.nat_gateway_mode }}
+      ENABLE_S3_ENDPOINT: ${{ inputs.enable_s3_endpoint }}
       TAGS_JSON: ${{ inputs.tags }}
       ENABLE_DNS_SUPPORT: ${{ inputs.enable_dns_support }}
       ENABLE_DNS_HOSTNAMES: ${{ inputs.enable_dns_hostnames }}
@@ -101,6 +117,8 @@ jobs:
             --arg vpc_cidr "$VPC_CIDR" \
             --argjson public_subnets "$public_subnets" \
             --argjson private_subnets "$private_subnets" \
+            --arg nat_gateway_mode "$NAT_GATEWAY_MODE" \
+            --argjson enable_s3_endpoint "$ENABLE_S3_ENDPOINT" \
             --argjson enable_dns_support "$ENABLE_DNS_SUPPORT" \
             --argjson enable_dns_hostnames "$ENABLE_DNS_HOSTNAMES" \
             --argjson tags "$tags" \
@@ -110,6 +128,8 @@ jobs:
               vpc_cidr: $vpc_cidr,
               public_subnets: $public_subnets,
               private_subnets: $private_subnets,
+              nat_gateway_mode: $nat_gateway_mode,
+              enable_s3_endpoint: $enable_s3_endpoint,
               enable_dns_support: $enable_dns_support,
               enable_dns_hostnames: $enable_dns_hostnames,
               tags: $tags

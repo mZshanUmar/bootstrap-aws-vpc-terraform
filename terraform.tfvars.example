@@ -24,6 +24,9 @@ private_subnets = {
   }
 }
 
+nat_gateway_mode = "None"
+enable_s3_endpoint = false
+
 tags = {
   Environment = "dev"
   ManagedBy   = "Terraform"
