@@ -1,9 +1,11 @@
+// Apply shared project tags to all resources, with resource-specific tags merged in below.
 locals {
   common_tags = merge(var.tags, {
     Project = var.vpc_name
   })
 }
 
+// Create the VPC and configure its DNS behavior.
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = var.enable_dns_support
@@ -14,6 +16,7 @@ resource "aws_vpc" "this" {
   })
 }
 
+// An internet gateway is only needed when the configuration includes public subnets.
 resource "aws_internet_gateway" "this" {
   count  = length(var.public_subnets) > 0 ? 1 : 0
   vpc_id = aws_vpc.this.id
@@ -23,6 +26,7 @@ resource "aws_internet_gateway" "this" {
   })
 }
 
+// Public subnets map launched instances to public IP addresses.
 resource "aws_subnet" "public" {
   for_each = var.public_subnets
 
@@ -37,6 +41,7 @@ resource "aws_subnet" "public" {
   })
 }
 
+// Send public-subnet traffic destined outside the VPC through the internet gateway.
 resource "aws_route_table" "public" {
   for_each = var.public_subnets
 
@@ -53,6 +58,7 @@ resource "aws_route_table" "public" {
   })
 }
 
+// Attach each public subnet to its matching public route table.
 resource "aws_route_table_association" "public" {
   for_each = var.public_subnets
 
@@ -60,6 +66,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public[each.key].id
 }
 
+// Private subnets do not automatically assign public IP addresses.
 resource "aws_subnet" "private" {
   for_each = var.private_subnets
 
@@ -73,6 +80,7 @@ resource "aws_subnet" "private" {
   })
 }
 
+// Private route tables have no internet route by default.
 resource "aws_route_table" "private" {
   for_each = var.private_subnets
 
@@ -84,6 +92,7 @@ resource "aws_route_table" "private" {
   })
 }
 
+// Attach each private subnet to its matching private route table.
 resource "aws_route_table_association" "private" {
   for_each = var.private_subnets
 
