@@ -1,0 +1,133 @@
+name: Deploy VPC
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_action:
+        description: Run a plan only or apply the changes
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+        required: true
+      aws_region:
+        description: AWS region
+        type: string
+        required: true
+      vpc_name:
+        description: VPC name
+        type: string
+        required: true
+      vpc_cidr:
+        description: VPC IPv4 CIDR
+        type: string
+        required: true
+      public_subnets:
+        description: Public subnets as a JSON object; use {} for none
+        type: string
+        default: "{}"
+        required: true
+      private_subnets:
+        description: Private subnets as a JSON object; use {} for none
+        type: string
+        default: "{}"
+        required: true
+      enable_dns_support:
+        description: Enable VPC DNS support
+        type: boolean
+        default: true
+        required: true
+      enable_dns_hostnames:
+        description: Enable VPC DNS hostnames
+        type: boolean
+        default: true
+        required: true
+      tags:
+        description: Additional resource tags as a JSON object
+        type: string
+        default: "{}"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-vpc
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Terraform ${{ inputs.deployment_action }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.deployment_action == 'apply' && 'vpc-deploy' || 'vpc-plan' }}
+    env:
+      TF_IN_AUTOMATION: "true"
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ inputs.aws_region }}
+      AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+      PUBLIC_SUBNETS_JSON: ${{ inputs.public_subnets }}
+      PRIVATE_SUBNETS_JSON: ${{ inputs.private_subnets }}
+      TAGS_JSON: ${{ inputs.tags }}
+      ENABLE_DNS_SUPPORT: ${{ inputs.enable_dns_support }}
+      ENABLE_DNS_HOSTNAMES: ${{ inputs.enable_dns_hostnames }}
+      VPC_NAME: ${{ inputs.vpc_name }}
+      VPC_CIDR: ${{ inputs.vpc_cidr }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Create Terraform variable file
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PUBLIC_SUBNETS_JSON")"
+          private_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PRIVATE_SUBNETS_JSON")"
+          tags="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$TAGS_JSON")"
+          jq -n \
+            --arg aws_region "$AWS_REGION" \
+            --arg vpc_name "$VPC_NAME" \
+            --arg vpc_cidr "$VPC_CIDR" \
+            --argjson public_subnets "$public_subnets" \
+            --argjson private_subnets "$private_subnets" \
+            --argjson enable_dns_support "$ENABLE_DNS_SUPPORT" \
+            --argjson enable_dns_hostnames "$ENABLE_DNS_HOSTNAMES" \
+            --argjson tags "$tags" \
+            '{
+              aws_region: $aws_region,
+              vpc_name: $vpc_name,
+              vpc_cidr: $vpc_cidr,
+              public_subnets: $public_subnets,
+              private_subnets: $private_subnets,
+              enable_dns_support: $enable_dns_support,
+              enable_dns_hostnames: $enable_dns_hostnames,
+              tags: $tags
+            }' > terraform.tfvars.json
+
+      - name: Initialize Terraform
+        run: terraform init -input=false
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Plan Terraform changes
+        run: terraform plan -input=false
+
+      - name: Apply Terraform changes
+        if: inputs.deployment_action == 'apply'
+        run: terraform apply -auto-approve -input=false
+
+      - name: Show Terraform outputs
+        if: inputs.deployment_action == 'apply'
+        run: terraform output
