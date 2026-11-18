@@ -14,14 +14,17 @@ on:
       aws_region:
         description: AWS region
         type: string
+        default: us-east-1
         required: true
       vpc_name:
         description: VPC name
         type: string
+        default: example-vpc
         required: true
       vpc_cidr:
         description: VPC IPv4 CIDR
         type: string
+        default: 10.0.0.0/16
         required: true
       public_subnets:
         description: Public subnet JSON object; use {} for none

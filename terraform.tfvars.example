@@ -1,14 +1,25 @@
+# AWS region where the VPC and its resources will be created.
 aws_region = "us-east-1"
-vpc_name   = "example-vpc"
-vpc_cidr   = "10.0.0.0/16"
 
+# Name used for the VPC and as the Project tag on its resources.
+vpc_name = "example-vpc"
+
+# IPv4 address range for the VPC. All subnet CIDR ranges must fit inside it
+# and must not overlap each other.
+vpc_cidr = "10.0.0.0/16"
+
+# Public subnets get public IP assignment on launch and a default route to the
+# internet gateway. Use {} for no public subnets. Keys are used as Name tags.
 public_subnets = {
   public-a = {
     cidr_block        = "10.0.1.0/24"
+    # Use an Availability Zone in aws_region.
     availability_zone = "us-east-1a"
   }
 }
 
+# Private subnets do not get public IPs and have no internet route when NAT is
+# disabled. Use {} for no private subnets. Keys are used as Name tags.
 private_subnets = {
   private-a = {
     cidr_block        = "10.0.11.0/24"
@@ -20,9 +31,27 @@ private_subnets = {
   }
 }
 
+# Controls outbound internet access from private subnets:
+# - "None": no NAT gateways or default internet routes for private subnets.
+# - "Zonal": one NAT gateway per private-subnet AZ; requires a public subnet
+#   in every AZ that contains private subnets. NAT gateways incur charges.
+# - "Regional": one AWS Regional NAT gateway serves private subnets. It also
+#   requires internet-gateway connectivity and incurs charges.
 nat_gateway_mode = "None"
+
+# When true, creates an S3 gateway endpoint and associates it with private
+# route tables. Private subnets can access S3 without NAT; requires private
+# subnets. This does not provide general internet access.
 enable_s3_endpoint = false
 
+# Enables DNS resolution using the Amazon-provided VPC resolver.
+enable_dns_support = true
+
+# Enables DNS hostnames for instances in the VPC; requires DNS support.
+enable_dns_hostnames = true
+
+# Extra tags to apply to resources. Terraform also adds Project = vpc_name;
+# resource-specific Name and Tier tags are set by the configuration.
 tags = {
   Environment = "dev"
   ManagedBy   = "Terraform"

@@ -37,26 +37,58 @@ private_subnets = {
     availability_zone = "us-east-1b"
   }
 }
+
+nat_gateway_mode     = "None"
+enable_s3_endpoint   = false
+enable_dns_support   = true
+enable_dns_hostnames = true
+
+tags = {
+  Environment = "dev"
+  ManagedBy   = "Terraform"
+}
 ```
 
-Add or remove entries in either subnet map to control the number of subnets.
-Each map key becomes the subnet's `Name` tag; set its CIDR and availability
-zone in the value. Set either map to `{}` to create no subnets of that type.
-An internet gateway is created when public subnets exist or Regional NAT mode
-is selected.
+### Variable reference
 
-Public subnets receive a default route to the internet gateway and assign public
-IPv4 addresses on launch. Each private subnet has its own route table and no
-internet default route unless NAT gateways are enabled.
+- `aws_region`: AWS region where the VPC and its resources are created. Every
+  subnet's `availability_zone` must be valid in this region.
+- `vpc_name`: VPC name, also used for the `Project` tag.
+- `vpc_cidr`: IPv4 address range for the VPC. Every subnet range must fit
+  inside it, and subnet ranges must not overlap.
+- `public_subnets`: Map of public subnet definitions. Each entry has a
+  `cidr_block` and `availability_zone`; its map key becomes the subnet's `Name`
+  tag. Public subnets assign public IPv4 addresses on launch and have a default
+  route to the internet gateway. Set to `{}` for none.
+- `private_subnets`: Map of private subnet definitions with the same fields
+  and key behavior. Private subnets do not assign public IPs and have no
+  internet default route unless NAT is enabled. Set to `{}` for none.
+- `nat_gateway_mode`: Controls outbound internet access from private subnets:
+  - `None` (default): creates no NAT gateway and adds no internet route to
+    private subnet route tables.
+  - `Zonal`: creates a NAT gateway in each AZ containing private subnets.
+    Requires a public subnet in every such AZ. The example's public subnet is
+    only in `us-east-1a`, so enable Zonal mode only after adding a public subnet
+    in `us-east-1b` as well. NAT gateways incur hourly and data-processing
+    charges.
+  - `Regional`: creates one native AWS Regional NAT Gateway for private
+    subnets. It requires internet-gateway connectivity and incurs charges.
+- `enable_s3_endpoint`: When `true`, creates an S3 gateway endpoint associated
+  with private route tables. This lets private subnets reach S3 without NAT;
+  it does not provide general internet access and requires at least one private
+  subnet.
+- `enable_dns_support`: Enables DNS resolution through the Amazon-provided
+  resolver in the VPC. Defaults to `true`.
+- `enable_dns_hostnames`: Enables DNS hostnames for instances in the VPC.
+  Defaults to `true`; keep DNS support enabled as well.
+- `tags`: Extra tags applied to resources. The configuration also adds
+  `Project` and resource-specific `Name` and `Tier` tags.
 
-Set `nat_gateway_mode` to `None` (default), `Zonal`, or `Regional` to control
-private-subnet internet access. `Zonal` creates a NAT gateway in each AZ that
-has private subnets and requires a public subnet in each such AZ. `Regional`
-creates one native AWS Regional NAT Gateway. NAT gateways incur hourly and
-data-processing charges. Set `enable_s3_endpoint = true` to add an S3 gateway
-endpoint to the private route tables; it requires at least one private subnet.
-Optional variables also include `enable_dns_support`, `enable_dns_hostnames`,
-and `tags`. See `variables.tf` for defaults and descriptions.
+The defaults create one public subnet and two private subnets in separate
+Availability Zones, with NAT disabled. The public subnet and private subnet in
+`us-east-1a` use different CIDR ranges. See
+[`terraform.tfvars.example`](./terraform.tfvars.example) for an annotated,
+ready-to-copy configuration.
 
 ## Deploy
 
