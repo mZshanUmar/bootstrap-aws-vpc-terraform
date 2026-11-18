@@ -24,7 +24,12 @@ variable "public_subnets" {
     cidr_block        = string
     availability_zone = string
   }))
-  default = {}
+  default = {
+    public-a = {
+      cidr_block        = "10.0.1.0/24"
+      availability_zone = "us-east-1a"
+    }
+  }
 
   validation {
     condition = alltrue([
@@ -40,7 +45,16 @@ variable "private_subnets" {
     cidr_block        = string
     availability_zone = string
   }))
-  default = {}
+  default = {
+    private-a = {
+      cidr_block        = "10.0.11.0/24"
+      availability_zone = "us-east-1a"
+    }
+    private-b = {
+      cidr_block        = "10.0.12.0/24"
+      availability_zone = "us-east-1b"
+    }
+  }
 
   validation {
     condition = alltrue([

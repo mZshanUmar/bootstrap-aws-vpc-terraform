@@ -32,6 +32,10 @@ private_subnets = {
     cidr_block        = "10.0.11.0/24"
     availability_zone = "us-east-1a"
   }
+  private-b = {
+    cidr_block        = "10.0.12.0/24"
+    availability_zone = "us-east-1b"
+  }
 }
 ```
 
@@ -83,9 +87,8 @@ example:
 ```
 
 Set either subnet input to `{}` to omit that subnet type. The `apply` action uses
-the `vpc-deploy` GitHub Environment; configure required reviewers for that
-environment to gate deployments. The `plan` action uses `vpc-plan` and does not
-require approval by default.
+the same workflow job as `plan`; choose `apply` only when you intend Terraform
+to create or update infrastructure.
 
 Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode and whether to
 create an S3 gateway endpoint in the workflow inputs. NAT gateways can incur
