@@ -39,6 +39,7 @@ private_subnets = {
 }
 
 nat_gateway_mode     = "None"
+zonal_nat_gateway_availability_zones = null
 enable_s3_endpoint   = false
 enable_dns_support   = true
 enable_dns_hostnames = true
@@ -66,13 +67,19 @@ tags = {
 - `nat_gateway_mode`: Controls outbound internet access from private subnets:
   - `None` (default): creates no NAT gateway and adds no internet route to
     private subnet route tables.
-  - `Zonal`: creates a NAT gateway in each AZ containing private subnets.
-    Requires a public subnet in every such AZ. The example's public subnet is
-    only in `us-east-1a`, so enable Zonal mode only after adding a public subnet
-    in `us-east-1b` as well. NAT gateways incur hourly and data-processing
-    charges.
+  - `Zonal`: creates NAT gateways and private-subnet internet routes in the AZs
+    selected by `zonal_nat_gateway_availability_zones`. NAT gateways incur
+    hourly and data-processing charges.
   - `Regional`: creates one native AWS Regional NAT Gateway for private
     subnets. It requires internet-gateway connectivity and incurs charges.
+- `zonal_nat_gateway_availability_zones`: Applies only when
+  `nat_gateway_mode = "Zonal"`. `null` (default) preserves the automatic
+  behavior: create a NAT gateway for every private-subnet AZ, with a public
+  subnet required in each. An explicit list, such as `["us-east-1a"]`, limits
+  NAT gateways and private NAT routes to those AZs. Every listed AZ must have
+  both a public and private subnet; private subnets in unlisted AZs will have
+  no NAT route. Use `[]` to explicitly create no Zonal NAT gateways or NAT
+  routes.
 - `enable_s3_endpoint`: When `true`, creates an S3 gateway endpoint associated
   with private route tables. This lets private subnets reach S3 without NAT;
   it does not provide general internet access and requires at least one private
@@ -106,8 +113,8 @@ route table IDs.
 The **Deploy VPC** workflow is manually triggered from the repository's
 **Actions** tab using **Run workflow**. Choose `plan` to review changes without
 applying them, or `apply` to create/update the VPC. Every Terraform variable is
-provided as a workflow input. Subnets and tags are entered as JSON objects, for
-example:
+provided as a workflow input. Subnets and tags are entered as JSON objects, and
+`zonal_nat_gateway_availability_zones` accepts a JSON array, for example:
 
 ```json
 {
@@ -117,6 +124,11 @@ example:
   }
 }
 ```
+
+For that input, use `null` to create Zonal NAT gateways in every private-subnet
+AZ, or `["us-east-1a"]` to create one only in `us-east-1a`. Use `[]` for no
+Zonal NAT gateways. Private subnets in unlisted AZs will not have a NAT route.
+Every AZ in a non-empty list must have both public and private subnets.
 
 Set either subnet input to `{}` to omit that subnet type. The `apply` action uses
 the same workflow job as `plan`; choose `apply` only when you intend Terraform

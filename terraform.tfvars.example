@@ -39,6 +39,13 @@ private_subnets = {
 #   requires internet-gateway connectivity and incurs charges.
 nat_gateway_mode = "None"
 
+# Applies only when nat_gateway_mode = "Zonal":
+# - null: create a NAT gateway for every private-subnet AZ; each needs a public subnet.
+# - ["us-east-1a"]: create NAT gateways and private NAT routes only in listed AZs.
+#   Each listed AZ must have public and private subnets; other AZs get no NAT route.
+# - []: explicitly create no Zonal NAT gateways or private NAT routes.
+zonal_nat_gateway_availability_zones = null
+
 # When true, creates an S3 gateway endpoint and associates it with private
 # route tables. Private subnets can access S3 without NAT; requires private
 # subnets. This does not provide general internet access.

@@ -75,6 +75,12 @@ variable "nat_gateway_mode" {
   }
 }
 
+variable "zonal_nat_gateway_availability_zones" {
+  description = "AZs that receive Zonal NAT gateways. Null uses all private-subnet AZs; an explicit list limits NAT gateways and private NAT routes to those AZs."
+  type        = list(string)
+  default     = null
+}
+
 variable "enable_s3_endpoint" {
   description = "Create an S3 gateway VPC endpoint associated with private route tables."
   type        = bool

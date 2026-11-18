@@ -45,6 +45,11 @@ on:
           - Regional
         default: None
         required: true
+      zonal_nat_gateway_availability_zones:
+        description: JSON AZ list for Zonal NAT (null uses all private-subnet AZs; [] disables zonal NAT)
+        type: string
+        default: "null"
+        required: true
       enable_s3_endpoint:
         description: Create an S3 gateway endpoint for private subnets
         type: boolean
@@ -86,6 +91,7 @@ jobs:
       PUBLIC_SUBNETS_JSON: ${{ inputs.public_subnets }}
       PRIVATE_SUBNETS_JSON: ${{ inputs.private_subnets }}
       NAT_GATEWAY_MODE: ${{ inputs.nat_gateway_mode }}
+      ZONAL_NAT_GATEWAY_AVAILABILITY_ZONES_JSON: ${{ inputs.zonal_nat_gateway_availability_zones }}
       ENABLE_S3_ENDPOINT: ${{ inputs.enable_s3_endpoint }}
       TAGS_JSON: ${{ inputs.tags }}
       ENABLE_DNS_SUPPORT: ${{ inputs.enable_dns_support }}
@@ -111,6 +117,7 @@ jobs:
           set -euo pipefail
           public_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PUBLIC_SUBNETS_JSON")"
           private_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PRIVATE_SUBNETS_JSON")"
+          zonal_nat_gateway_availability_zones="$(jq -c 'if . == null or (type == "array" and all(.[]; type == "string")) then . else error("must be null or a JSON array of strings") end' <<< "$ZONAL_NAT_GATEWAY_AVAILABILITY_ZONES_JSON")"
           tags="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$TAGS_JSON")"
           jq -n \
             --arg aws_region "$AWS_REGION" \
@@ -119,6 +126,7 @@ jobs:
             --argjson public_subnets "$public_subnets" \
             --argjson private_subnets "$private_subnets" \
             --arg nat_gateway_mode "$NAT_GATEWAY_MODE" \
+            --argjson zonal_nat_gateway_availability_zones "$zonal_nat_gateway_availability_zones" \
             --argjson enable_s3_endpoint "$ENABLE_S3_ENDPOINT" \
             --argjson enable_dns_support "$ENABLE_DNS_SUPPORT" \
             --argjson enable_dns_hostnames "$ENABLE_DNS_HOSTNAMES" \
@@ -130,6 +138,7 @@ jobs:
               public_subnets: $public_subnets,
               private_subnets: $private_subnets,
               nat_gateway_mode: $nat_gateway_mode,
+              zonal_nat_gateway_availability_zones: $zonal_nat_gateway_availability_zones,
               enable_s3_endpoint: $enable_s3_endpoint,
               enable_dns_support: $enable_dns_support,
               enable_dns_hostnames: $enable_dns_hostnames,
