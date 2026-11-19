@@ -7,7 +7,7 @@ when no public subnets are configured.
 
 ## Requirements
 
-- Terraform 1.5 or later
+- Terraform 1.10 or later
 - AWS credentials configured for the account where you want to create resources
 - Availability zones valid for the selected AWS region
 
@@ -95,10 +95,14 @@ ready-to-copy configuration.
 ## Deploy
 
 ```sh
-terraform init
+terraform init -backend=false
 terraform plan
 terraform apply
 ```
+
+For persistent state, configure an S3 backend with an existing bucket and state
+key. The GitHub Actions workflow accepts the bucket and key together as one S3
+URI in its `terraform_state_location` input.
 
 Terraform outputs the VPC ID, optional internet gateway ID, subnet IDs, and
 route table IDs.
@@ -138,13 +142,20 @@ can incur significant charges; `None` is the default.
 After an `apply`, Terraform outputs are included in the run summary as JSON.
 Sensitive outputs, if any are added later, are omitted from the summary.
 
+### Terraform state backend
+
+The workflow's **Terraform state location** input defaults to `local`, which
+uses temporary runner storage. To persist state, enter one S3 URI in the form
+`s3://bucket-name/path/to/terraform.tfstate`. The bucket must already exist;
+the backend region is the selected AWS region. The workflow enables S3
+encryption and native state locking. Enable bucket versioning for recovery.
+
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
-trusted for GitHub Actions OIDC. Grant that role only the AWS permissions needed
-to manage this VPC, and restrict its OIDC trust policy to this repository and
+trusted for GitHub Actions OIDC. For S3 state, grant the role the necessary
+access to the selected bucket and key, in addition to the AWS permissions
+needed to manage the VPC. Restrict its OIDC trust policy to this repository and
 your allowed branch or environment.
 
-**State warning:** this workflow uses Terraform's local state on an ephemeral
-GitHub runner and does not preserve it after a run. It is suitable only for a
-one-time deployment as requested; later runs cannot reliably manage or destroy
-resources created by an earlier run. Use a persistent remote backend such as
-S3 before relying on repeatable deployments or updates.
+If `local` is selected, state remains on the ephemeral GitHub runner and is lost
+after the run. Later runs cannot reliably manage or destroy resources from an
+earlier run. Reuse the same S3 URI across runs to manage the same VPC state.
