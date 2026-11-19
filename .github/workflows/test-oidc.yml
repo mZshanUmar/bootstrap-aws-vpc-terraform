@@ -1,0 +1,33 @@
+name: Test OIDC
+
+on:
+  workflow_dispatch:   # run manually from the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write      # required to get the OIDC token
+  contents: read
+
+jobs:
+  test-oidc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show OIDC token claims (safe to print, token itself is not shown)
+        run: |
+          RESP=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+          PAYLOAD=$(echo "$RESP" | jq -r .value | cut -d. -f2)
+          # pad base64 and decode
+          PAYLOAD="$PAYLOAD$(printf '%*s' $(( (4 - ${#PAYLOAD} % 4) % 4 )) '' | tr ' ' '=')"
+          echo "$PAYLOAD" | tr '_-' '/+' | base64 -d | jq '{iss, aud, sub, repository, ref}'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          retry-max-attempts: 1   # fail fast instead of retrying 12 times
+
+      - name: Verify identity
+        run: aws sts get-caller-identity
