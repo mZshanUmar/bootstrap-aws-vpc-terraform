@@ -57,16 +57,9 @@ resource "aws_vpc" "this" {
       )
       error_message = "Zonal NAT gateways require public and private subnets in every selected AZ; when no AZ list is provided, every private-subnet AZ needs a public subnet."
     }
-
-    precondition {
-      condition     = !var.enable_s3_endpoint || length(var.private_subnets) > 0
-      error_message = "The S3 gateway endpoint requires at least one private subnet."
-    }
   }
 
-  tags = merge(local.common_tags, {
-    Name = var.vpc_name
-  })
+  tags = merge(local.common_tags, {Name = var.vpc_name})
 }
 
 // An internet gateway is only needed when the configuration includes public subnets.
@@ -204,17 +197,4 @@ resource "aws_route" "private_nat" {
   nat_gateway_id = var.nat_gateway_mode == "Regional" ? (
     aws_nat_gateway.regional[0].id
   ) : try(aws_nat_gateway.zonal[each.value.availability_zone].id, null)
-}
-
-resource "aws_vpc_endpoint" "s3" {
-  count = var.enable_s3_endpoint ? 1 : 0
-
-  vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${var.aws_region}.s3"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids   = [for route_table in aws_route_table.private : route_table.id]
-
-  tags = merge(local.common_tags, {
-    Name = "${var.vpc_name}-s3"
-  })
 }

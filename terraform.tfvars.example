@@ -46,11 +46,6 @@ nat_gateway_mode = "None"
 # - []: explicitly create no Zonal NAT gateways or private NAT routes.
 zonal_nat_gateway_availability_zones = null
 
-# When true, creates an S3 gateway endpoint and associates it with private
-# route tables. Private subnets can access S3 without NAT; requires private
-# subnets. This does not provide general internet access.
-enable_s3_endpoint = false
-
 # Enables DNS resolution using the Amazon-provided VPC resolver.
 enable_dns_support = true
 

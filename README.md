@@ -40,7 +40,6 @@ private_subnets = {
 
 nat_gateway_mode     = "None"
 zonal_nat_gateway_availability_zones = null
-enable_s3_endpoint   = false
 enable_dns_support   = true
 enable_dns_hostnames = true
 
@@ -80,10 +79,6 @@ tags = {
   both a public and private subnet; private subnets in unlisted AZs will have
   no NAT route. Use `[]` to explicitly create no Zonal NAT gateways or NAT
   routes.
-- `enable_s3_endpoint`: When `true`, creates an S3 gateway endpoint associated
-  with private route tables. This lets private subnets reach S3 without NAT;
-  it does not provide general internet access and requires at least one private
-  subnet.
 - `enable_dns_support`: Enables DNS resolution through the Amazon-provided
   resolver in the VPC. Defaults to `true`.
 - `enable_dns_hostnames`: Enables DNS hostnames for instances in the VPC.
@@ -112,7 +107,10 @@ route table IDs.
 
 The **Deploy VPC** workflow is manually triggered from the repository's
 **Actions** tab using **Run workflow**. Choose `plan` to review changes without
-applying them, or `apply` to create/update the VPC. Every Terraform variable is
+applying them, or `apply` to create/update the VPC. The workflow saves the
+Terraform plan and applies that exact saved plan when `apply` is selected. A
+concise summary of planned additions, in-place changes, replacements, and
+deletions is added to the run's deployment summary. Every Terraform variable is
 provided as a workflow input. Subnets and tags are entered as JSON objects, and
 `zonal_nat_gateway_availability_zones` accepts a JSON array, for example:
 
@@ -134,9 +132,11 @@ Set either subnet input to `{}` to omit that subnet type. The `apply` action use
 the same workflow job as `plan`; choose `apply` only when you intend Terraform
 to create or update infrastructure.
 
-Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode and whether to
-create an S3 gateway endpoint in the workflow inputs. NAT gateways can incur
-significant charges; `None` is the default.
+Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode. NAT gateways
+can incur significant charges; `None` is the default.
+
+After an `apply`, Terraform outputs are included in the run summary as JSON.
+Sensitive outputs, if any are added later, are omitted from the summary.
 
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
 trusted for GitHub Actions OIDC. Grant that role only the AWS permissions needed

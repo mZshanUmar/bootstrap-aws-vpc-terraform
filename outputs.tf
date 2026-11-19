@@ -35,8 +35,3 @@ output "nat_gateway_ids" {
     { for nat_gateway in aws_nat_gateway.regional : "regional" => nat_gateway.id }
   )
 }
-
-output "s3_vpc_endpoint_id" {
-  description = "S3 gateway VPC endpoint ID, or null when it is disabled."
-  value       = length(aws_vpc_endpoint.s3) > 0 ? aws_vpc_endpoint.s3[0].id : null
-}

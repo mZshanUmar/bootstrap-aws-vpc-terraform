@@ -1,0 +1,197 @@
+name: Deploy VPC
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_action:
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+        description: Just plan or apply as well (Apply will create/update/destroy resources)
+      aws_region:
+        required: true
+        type: string
+        default: us-east-1
+        description: AWS region where to deploy the VPC
+      vpc_name:
+        required: true
+        type: string
+        default: my-vpc
+        description: Name of the VPC
+      enable_dns_support:
+        description: Enable VPC DNS support (Whether the VPC supports DNS resolution using the Amazon-provided resolver)
+        type: boolean
+        default: true
+        required: false
+      enable_dns_hostnames:
+        description: Enable VPC DNS hostnames (Whether instances in the VPC are assigned DNS hostnames)
+        type: boolean
+        default: true
+        required: false
+      vpc_cidr:
+        required: true
+        type: string
+        default: 10.0.0.0/16
+        description: VPC IPv4 CIDR
+      public_subnets:
+        required: true
+        type: string
+        default: '{"public-a":{"cidr_block":"10.0.1.0/24","availability_zone":"us-east-1a"}}'
+        description: Public subnet JSON object; use {} for none
+      private_subnets:
+        required: true
+        type: string
+        default: '{"private-a":{"cidr_block":"10.0.11.0/24","availability_zone":"us-east-1a"},"private-b":{"cidr_block":"10.0.12.0/24","availability_zone":"us-east-1b"}}'
+        description: Private subnets as a JSON object; use {} for none
+      nat_gateway_mode:
+        required: false
+        type: choice
+        options:
+          - None
+          - Zonal
+          - Regional
+        default: None
+        description: NAT gateways incur hourly and data processing costs, choose None to avoid NAT gateways, Zonal for one per private subnet AZ, or Regional for one per public subnet AZ
+      zonal_nat_gateway_availability_zones:
+        required: false
+        type: string
+        default: "null"
+        description: JSON AZ list for Zonal NAT (null uses all private-subnet AZs; [] disables zonal NAT)
+      tags:
+        description: Additional resource tags as a JSON object
+        type: string
+        default: "{}"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-vpc
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: terraform ${{ inputs.deployment_action }}
+    runs-on: ubuntu-latest
+    env:
+      AWS_OIDC_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ inputs.aws_region }}
+      VPC_NAME: ${{ inputs.vpc_name }}
+      VPC_CIDR: ${{ inputs.vpc_cidr }}
+      ENABLE_DNS_SUPPORT: ${{ inputs.enable_dns_support }}
+      ENABLE_DNS_HOSTNAMES: ${{ inputs.enable_dns_hostnames }}
+      PUBLIC_SUBNETS: ${{ inputs.public_subnets }}
+      PRIVATE_SUBNETS: ${{ inputs.private_subnets }}
+      NAT_GATEWAY_MODE: ${{ inputs.nat_gateway_mode }}
+      ZONAL_NAT_GATEWAY_AVAILABILITY_ZONES: ${{ inputs.zonal_nat_gateway_availability_zones }}
+      TAGS: ${{ inputs.tags }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Create Terraform variable file
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PUBLIC_SUBNETS")"
+          private_subnets="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$PRIVATE_SUBNETS")"
+          zonal_nat_gateway_availability_zones="$(jq -c 'if . == null or (type == "array" and all(.[]; type == "string")) then . else error("must be null or a JSON array of strings") end' <<< "$ZONAL_NAT_GATEWAY_AVAILABILITY_ZONES")"
+          tags="$(jq -ce 'if type == "object" then . else error("must be a JSON object") end' <<< "$TAGS")"
+          jq -n \
+            --arg aws_region "$AWS_REGION" \
+            --arg vpc_name "$VPC_NAME" \
+            --arg vpc_cidr "$VPC_CIDR" \
+            --argjson public_subnets "$public_subnets" \
+            --argjson private_subnets "$private_subnets" \
+            --arg nat_gateway_mode "$NAT_GATEWAY_MODE" \
+            --argjson zonal_nat_gateway_availability_zones "$zonal_nat_gateway_availability_zones" \
+            --argjson enable_dns_support "$ENABLE_DNS_SUPPORT" \
+            --argjson enable_dns_hostnames "$ENABLE_DNS_HOSTNAMES" \
+            --argjson tags "$tags" \
+            '{
+              aws_region: $aws_region,
+              vpc_name: $vpc_name,
+              vpc_cidr: $vpc_cidr,
+              public_subnets: $public_subnets,
+              private_subnets: $private_subnets,
+              nat_gateway_mode: $nat_gateway_mode,
+              zonal_nat_gateway_availability_zones: $zonal_nat_gateway_availability_zones,
+              enable_dns_support: $enable_dns_support,
+              enable_dns_hostnames: $enable_dns_hostnames,
+              tags: $tags
+            }' > terraform.tfvars.json
+
+      - name: Initialize Terraform
+        run: terraform init -input=false
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Plan Terraform changes
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Add plan summary to deployment summary
+        shell: bash
+        env:
+          DEPLOYMENT_ACTION: ${{ inputs.deployment_action }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Terraform plan summary"
+            echo
+            echo "- **Requested action:** ${DEPLOYMENT_ACTION}"
+            echo "- **VPC:** ${VPC_NAME}"
+            echo "- **AWS region:** ${AWS_REGION}"
+            echo
+            terraform show -json tfplan | jq -r '
+              (.resource_changes // []) as $changes |
+              {
+                add: ([$changes[] | select(.change.actions == ["create"])] | length),
+                change: ([$changes[] | select(.change.actions == ["update"])] | length),
+                destroy: ([$changes[] | select(.change.actions == ["delete"])] | length),
+                replace: ([$changes[] | select((.change.actions | index("create")) and (.change.actions | index("delete")))] | length)
+              } |
+              "| Change | Resources |\n| --- | ---: |\n| Add | \(.add) |\n| Change in place | \(.change) |\n| Replace | \(.replace) |\n| Destroy | \(.destroy) |"
+            '
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply Terraform changes
+        if: inputs.deployment_action == 'apply'
+        run: terraform apply -input=false tfplan
+
+      - name: Show Terraform outputs
+        if: inputs.deployment_action == 'apply'
+        run: terraform output
+
+      - name: Add Terraform outputs to deployment summary
+        if: inputs.deployment_action == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "## Terraform outputs"
+            echo
+            echo '```json'
+            terraform output -json | jq '
+              to_entries
+              | map(select(.value.sensitive != true) | {key: .key, value: .value.value})
+              | from_entries
+            '
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

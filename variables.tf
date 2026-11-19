@@ -8,9 +8,22 @@ variable "vpc_name" {
   type        = string
 }
 
+variable "enable_dns_support" {
+  description = "Enable DNS resolution in the VPC."
+  type        = bool
+  default     = true
+}
+
+variable "enable_dns_hostnames" {
+  description = "Enable DNS hostnames in the VPC."
+  type        = bool
+  default     = true
+}
+
 variable "vpc_cidr" {
   description = "IPv4 CIDR block for the VPC."
   type        = string
+  default     = "10.0.0.0/16"
 
   validation {
     condition     = can(cidrnetmask(var.vpc_cidr))
@@ -30,7 +43,6 @@ variable "public_subnets" {
       availability_zone = "us-east-1a"
     }
   }
-
   validation {
     condition = alltrue([
       for subnet in values(var.public_subnets) : can(cidrnetmask(subnet.cidr_block))
@@ -55,7 +67,6 @@ variable "private_subnets" {
       availability_zone = "us-east-1b"
     }
   }
-
   validation {
     condition = alltrue([
       for subnet in values(var.private_subnets) : can(cidrnetmask(subnet.cidr_block))
@@ -79,24 +90,6 @@ variable "zonal_nat_gateway_availability_zones" {
   description = "AZs that receive Zonal NAT gateways. Null uses all private-subnet AZs; an explicit list limits NAT gateways and private NAT routes to those AZs."
   type        = list(string)
   default     = null
-}
-
-variable "enable_s3_endpoint" {
-  description = "Create an S3 gateway VPC endpoint associated with private route tables."
-  type        = bool
-  default     = false
-}
-
-variable "enable_dns_support" {
-  description = "Enable DNS resolution in the VPC."
-  type        = bool
-  default     = true
-}
-
-variable "enable_dns_hostnames" {
-  description = "Enable DNS hostnames in the VPC."
-  type        = bool
-  default     = true
 }
 
 variable "tags" {
