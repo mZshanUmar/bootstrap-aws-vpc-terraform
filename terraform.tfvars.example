@@ -2,7 +2,7 @@
 aws_region = "us-east-1"
 
 # Name used for the VPC and as the Project tag on its resources.
-vpc_name = "zshan-vpc"
+vpc_name = "my-vpc"
 
 # IPv4 address range for the VPC. All subnet CIDR ranges must fit inside it
 # and must not overlap each other.
