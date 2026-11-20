@@ -11,11 +11,16 @@ on:
           - apply
         default: plan
         description: Just plan or apply as well (Apply will create/update/destroy resources)
-      terraform_state_location:
+      s3_state_bucket:
         required: true
         type: string
-        default: local
-        description: Use local state or provide an S3 URI such as s3://bucket-name/path/to/terraform.tfstate
+        default: ""
+        description: Existing S3 bucket where Terraform state will be stored
+      s3_state_key_prefix:
+        required: false
+        type: string
+        default: ""
+        description: Optional S3 key prefix; the workflow appends terraform.tfstate
       aws_region:
         required: true
         type: string
@@ -86,7 +91,8 @@ jobs:
     env:
       AWS_OIDC_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_REGION: ${{ inputs.aws_region }}
-      TERRAFORM_STATE_LOCATION: ${{ inputs.terraform_state_location }}
+      S3_STATE_BUCKET: ${{ inputs.s3_state_bucket }}
+      S3_STATE_KEY_PREFIX: ${{ inputs.s3_state_key_prefix }}
       VPC_NAME: ${{ inputs.vpc_name }}
       VPC_CIDR: ${{ inputs.vpc_cidr }}
       ENABLE_DNS_SUPPORT: ${{ inputs.enable_dns_support }}
@@ -146,30 +152,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$TERRAFORM_STATE_LOCATION" == "local" ]]; then
-            terraform init -input=false -backend=false
-          elif [[ "$TERRAFORM_STATE_LOCATION" == s3://* ]]; then
-            state_path="${TERRAFORM_STATE_LOCATION#s3://}"
-            if [[ "$state_path" != */* ]]; then
-              echo "::error::S3 state must include a bucket and a key, e.g. s3://bucket-name/path/to/terraform.tfstate."
-              exit 1
-            fi
-            state_bucket="${state_path%%/*}"
-            state_key="${state_path#*/}"
-            if [[ -z "$state_bucket" || -z "$state_key" ]]; then
-              echo "::error::S3 state URI must include a non-empty bucket and key."
-              exit 1
-            fi
-            terraform init -input=false -reconfigure \
-              -backend-config="bucket=${state_bucket}" \
-              -backend-config="key=${state_key}" \
-              -backend-config="region=${AWS_REGION}" \
-              -backend-config="encrypt=true" \
-              -backend-config="use_lockfile=true"
-          else
-            echo "::error::terraform_state_location must be 'local' or an S3 URI such as s3://bucket-name/path/to/terraform.tfstate."
+          if [[ -z "$S3_STATE_BUCKET" ]]; then
+            echo "::error::s3_state_bucket is required."
             exit 1
           fi
+          state_key="terraform.tfstate"
+          if [[ -n "$S3_STATE_KEY_PREFIX" ]]; then
+            if [[ "$S3_STATE_KEY_PREFIX" == /* || "$S3_STATE_KEY_PREFIX" == */ || "$S3_STATE_KEY_PREFIX" == *//* ]]; then
+              echo "::error::s3_state_key_prefix must be a relative path without leading, trailing, or repeated slashes."
+              exit 1
+            fi
+            state_key="${S3_STATE_KEY_PREFIX}/${state_key}"
+          fi
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${S3_STATE_BUCKET}" \
+            -backend-config="key=${state_key}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
 
       - name: Validate Terraform
         run: terraform validate

@@ -95,14 +95,19 @@ ready-to-copy configuration.
 ## Deploy
 
 ```sh
-terraform init -backend=false
+terraform init \
+  -backend-config="bucket=your-state-bucket" \
+  -backend-config="key=terraform/vpc/terraform.tfstate" \
+  -backend-config="region=us-east-1" \
+  -backend-config="encrypt=true" \
+  -backend-config="use_lockfile=true"
 terraform plan
 terraform apply
 ```
 
-For persistent state, configure an S3 backend with an existing bucket and state
-key. The GitHub Actions workflow accepts the bucket and key together as one S3
-URI in its `terraform_state_location` input.
+An existing S3 bucket is required for the backend. The workflow accepts the
+bucket and an optional key prefix; it always uses `terraform.tfstate` as the
+state file name.
 
 Terraform outputs the VPC ID, optional internet gateway ID, subnet IDs, and
 route table IDs.
@@ -144,11 +149,13 @@ Sensitive outputs, if any are added later, are omitted from the summary.
 
 ### Terraform state backend
 
-The workflow's **Terraform state location** input defaults to `local`, which
-uses temporary runner storage. To persist state, enter one S3 URI in the form
-`s3://bucket-name/path/to/terraform.tfstate`. The bucket must already exist;
-the backend region is the selected AWS region. The workflow enables S3
-encryption and native state locking. Enable bucket versioning for recovery.
+The workflow requires the **S3 state bucket** input and accepts an optional
+**S3 state key prefix**. For example, bucket `my-tf-state` and prefix
+`terraform/vpc` store state at `terraform/vpc/terraform.tfstate`. Leave the
+prefix empty to store `terraform.tfstate` at the bucket root. The bucket must
+already exist; the backend region is the selected AWS region. The workflow
+enables S3 encryption and native state locking. Enable bucket versioning for
+recovery.
 
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
 trusted for GitHub Actions OIDC. For S3 state, grant the role the necessary
@@ -156,6 +163,7 @@ access to the selected bucket and key, in addition to the AWS permissions
 needed to manage the VPC. Restrict its OIDC trust policy to this repository and
 your allowed branch or environment.
 
-If `local` is selected, state remains on the ephemeral GitHub runner and is lost
-after the run. Later runs cannot reliably manage or destroy resources from an
-earlier run. Reuse the same S3 URI across runs to manage the same VPC state.
+Reuse the same bucket and prefix across runs to manage the same VPC state. If
+you have an existing local Terraform state file, migrate it to the S3 backend
+before running this workflow; otherwise Terraform may plan to recreate
+existing resources.
