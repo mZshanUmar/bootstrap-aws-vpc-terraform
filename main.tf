@@ -99,7 +99,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = merge(local.common_tags, {
-    Name = "${each.key}-public"
+    Name = "rtb-${each.key}-public"
     Tier = "public"
   })
 }
@@ -133,7 +133,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = "${each.key}-private"
+    Name = "rtb-${each.key}-private"
     Tier = "private"
   })
 }

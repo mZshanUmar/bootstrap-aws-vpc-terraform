@@ -54,7 +54,5 @@ enable_dns_hostnames = true
 
 # Extra tags to apply to resources. Terraform also adds Project = vpc_name;
 # resource-specific Name and Tier tags are set by the configuration.
-tags = {
-  Environment = "dev"
-  ManagedBy   = "Terraform"
-}
+# This matches the workflow's default tags input.
+tags = {}
