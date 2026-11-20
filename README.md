@@ -137,10 +137,19 @@ immediately applies that exact saved plan. There is no plan-only option, and
 plan details are not added to the deployment summary; Terraform outputs are
 shown there after apply.
 
+### Destroy the deployment
+
+To remove the VPC and all resources tracked by its Terraform state, run the
+**Destroy VPC** workflow from the **Actions** tab. Provide the same S3 bucket,
+key prefix, AWS region, and VPC name used for deployment, then type `DESTROY`
+in the confirmation field. The workflow creates and applies a saved destroy
+plan. This permanently deletes the resources in that state, so verify the
+bucket and prefix carefully before confirming.
+
 ### Workflow inputs
 
-Every Terraform variable is provided as a workflow input. Subnets and tags are
-entered as JSON objects, and
+For deployment, each Terraform variable is provided as a workflow input.
+Subnets and tags are entered as JSON objects, and
 `zonal_nat_gateway_availability_zones` accepts a JSON array, for example:
 
 ```json
@@ -182,8 +191,8 @@ recovery.
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
 trusted for GitHub Actions OIDC. For S3 state, grant the role the necessary
 access to the selected bucket and key, in addition to the AWS permissions
-needed to manage the VPC. Restrict its OIDC trust policy to this repository and
-your allowed branch or environment.
+needed to manage and destroy the VPC. Restrict its OIDC trust policy to this
+repository and your allowed branch or environment.
 
 Reuse the same bucket and prefix across runs to manage the same VPC state. If
 you have an existing local Terraform state file, migrate it to the S3 backend

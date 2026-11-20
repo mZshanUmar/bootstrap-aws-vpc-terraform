@@ -1,0 +1,114 @@
+name: Destroy VPC
+
+on:
+  workflow_dispatch:
+    inputs:
+      s3_state_bucket:
+        required: true
+        type: string
+        default: ""
+        description: Existing S3 bucket containing the Terraform state
+      s3_state_key_prefix:
+        required: false
+        type: string
+        default: ""
+        description: State key prefix used by the deployment workflow
+      aws_region:
+        required: true
+        type: string
+        default: us-east-1
+        description: AWS region where the VPC was deployed
+      vpc_name:
+        required: true
+        type: string
+        default: my-vpc
+        description: VPC name used when deploying
+      confirm_destroy:
+        required: true
+        type: string
+        default: ""
+        description: Type DESTROY to confirm permanent deletion
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-vpc
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Destroy VPC
+    runs-on: ubuntu-latest
+    env:
+      AWS_OIDC_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ inputs.aws_region }}
+      S3_STATE_BUCKET: ${{ inputs.s3_state_bucket }}
+      S3_STATE_KEY_PREFIX: ${{ inputs.s3_state_key_prefix }}
+      TF_VAR_aws_region: ${{ inputs.aws_region }}
+      TF_VAR_vpc_name: ${{ inputs.vpc_name }}
+      CONFIRM_DESTROY: ${{ inputs.confirm_destroy }}
+    steps:
+      - name: Confirm destructive action
+        shell: bash
+        run: |
+          if [[ "$CONFIRM_DESTROY" != "DESTROY" ]]; then
+            echo "::error::Type DESTROY in the confirmation input to continue."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Initialize Terraform
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$S3_STATE_BUCKET" ]]; then
+            echo "::error::s3_state_bucket is required."
+            exit 1
+          fi
+          state_key="terraform.tfstate"
+          if [[ -n "$S3_STATE_KEY_PREFIX" ]]; then
+            if [[ "$S3_STATE_KEY_PREFIX" == /* || "$S3_STATE_KEY_PREFIX" == */ || "$S3_STATE_KEY_PREFIX" == *//* ]]; then
+              echo "::error::s3_state_key_prefix must be a relative path without leading, trailing, or repeated slashes."
+              exit 1
+            fi
+            state_key="${S3_STATE_KEY_PREFIX}/${state_key}"
+          fi
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${S3_STATE_BUCKET}" \
+            -backend-config="key=${state_key}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Create saved destroy plan
+        run: terraform plan -destroy -input=false -out=destroy.tfplan
+
+      - name: Apply saved destroy plan
+        run: terraform apply -input=false destroy.tfplan
+
+      - name: Add destroy result to deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## VPC destruction complete"
+            echo
+            echo "- **VPC:** ${TF_VAR_vpc_name}"
+            echo "- **AWS region:** ${AWS_REGION}"
+            echo "- **State bucket:** ${S3_STATE_BUCKET}"
+          } >> "$GITHUB_STEP_SUMMARY"
