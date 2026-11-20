@@ -59,12 +59,12 @@ resource "aws_vpc" "this" {
     }
   }
 
-  tags = merge(local.common_tags, {Name = var.vpc_name})
+  tags = merge(local.common_tags, { Name = var.vpc_name })
 }
 
 // An internet gateway is only needed when the configuration includes public subnets.
 resource "aws_internet_gateway" "this" {
-  count  = length(var.public_subnets) > 0 || var.nat_gateway_mode == "Regional" ? 1 : 0
+  count  = length(var.public_subnets) > 0 ? 1 : 0
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
@@ -170,31 +170,14 @@ resource "aws_nat_gateway" "zonal" {
   })
 }
 
-resource "aws_nat_gateway" "regional" {
-  count = var.nat_gateway_mode == "Regional" ? 1 : 0
-
-  availability_mode = "regional"
-  vpc_id            = aws_vpc.this.id
-
-  depends_on = [aws_internet_gateway.this]
-
-  tags = merge(local.common_tags, {
-    Name = "${var.vpc_name}-nat-regional"
-  })
-}
-
 resource "aws_route" "private_nat" {
-  for_each = var.nat_gateway_mode == "Regional" ? var.private_subnets : (
-    var.nat_gateway_mode == "Zonal" ? {
-      for name, subnet in var.private_subnets :
-      name => subnet
-      if contains(keys(local.nat_gateway_subnets), subnet.availability_zone)
-    } : {}
-  )
+  for_each = var.nat_gateway_mode == "Zonal" ? {
+    for name, subnet in var.private_subnets :
+    name => subnet
+    if contains(keys(local.nat_gateway_subnets), subnet.availability_zone)
+  } : {}
 
   route_table_id         = aws_route_table.private[each.key].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id = var.nat_gateway_mode == "Regional" ? (
-    aws_nat_gateway.regional[0].id
-  ) : try(aws_nat_gateway.zonal[each.value.availability_zone].id, null)
+  nat_gateway_id         = aws_nat_gateway.zonal[each.value.availability_zone].id
 }

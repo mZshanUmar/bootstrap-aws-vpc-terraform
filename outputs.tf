@@ -4,7 +4,7 @@ output "vpc_id" {
 }
 
 output "internet_gateway_id" {
-  description = "ID of the internet gateway, or null when there are no public subnets and Regional NAT is disabled."
+  description = "ID of the internet gateway, or null when there are no public subnets."
   value       = length(aws_internet_gateway.this) > 0 ? aws_internet_gateway.this[0].id : null
 }
 
@@ -29,9 +29,6 @@ output "private_route_table_ids" {
 }
 
 output "nat_gateway_ids" {
-  description = "NAT gateway IDs keyed by Availability Zone or Regional mode."
-  value = merge(
-    { for az, nat_gateway in aws_nat_gateway.zonal : az => nat_gateway.id },
-    { for nat_gateway in aws_nat_gateway.regional : "regional" => nat_gateway.id }
-  )
+  description = "Zonal NAT gateway IDs keyed by Availability Zone."
+  value       = { for az, nat_gateway in aws_nat_gateway.zonal : az => nat_gateway.id }
 }

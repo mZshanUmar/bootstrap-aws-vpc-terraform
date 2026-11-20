@@ -54,9 +54,8 @@ on:
         options:
           - None
           - Zonal
-          - Regional
         default: None
-        description: NAT gateways incur hourly and data processing costs, choose None to avoid NAT gateways, Zonal for one per private subnet AZ, or Regional for one per public subnet AZ
+        description: NAT gateways incur hourly and data processing costs; choose None to avoid NAT gateways or Zonal for one per selected private subnet AZ
       zonal_nat_gateway_availability_zones:
         required: false
         type: string

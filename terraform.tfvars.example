@@ -35,8 +35,6 @@ private_subnets = {
 # - "None": no NAT gateways or default internet routes for private subnets.
 # - "Zonal": one NAT gateway per private-subnet AZ; requires a public subnet
 #   in every AZ that contains private subnets. NAT gateways incur charges.
-# - "Regional": one AWS Regional NAT gateway serves private subnets. It also
-#   requires internet-gateway connectivity and incurs charges.
 nat_gateway_mode = "None"
 
 # Applies only when nat_gateway_mode = "Zonal":

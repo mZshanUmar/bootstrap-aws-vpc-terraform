@@ -2,8 +2,7 @@
 
 A variable-driven Terraform template for an AWS VPC with configurable public and
 private subnets. Each subnet gets its own route table. Public subnets get
-internet-gateway routes; Regional NAT mode also creates an internet gateway
-when no public subnets are configured.
+internet-gateway routes.
 
 ## Requirements
 
@@ -71,8 +70,6 @@ tags = {
   - `Zonal`: creates NAT gateways and private-subnet internet routes in the AZs
     selected by `zonal_nat_gateway_availability_zones`. NAT gateways incur
     hourly and data-processing charges.
-  - `Regional`: creates one native AWS Regional NAT Gateway for private
-    subnets. It requires internet-gateway connectivity and incurs charges.
 - `zonal_nat_gateway_availability_zones`: Applies only when
   `nat_gateway_mode = "Zonal"`. `null` (default) preserves the automatic
   behavior: create a NAT gateway for every private-subnet AZ, with a public
@@ -170,8 +167,8 @@ Set either subnet input to `{}` to omit that subnet type. Running this workflow
 will apply the requested configuration, including creating, updating, or
 destroying resources as required by Terraform.
 
-Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode. NAT gateways
-can incur significant charges; `None` is the default.
+Choose `None` or `Zonal` for the NAT gateway mode. NAT gateways can incur
+significant charges; `None` is the default.
 
 After an `apply`, Terraform outputs are included in the run summary as JSON.
 Sensitive outputs, if any are added later, are omitted from the summary.

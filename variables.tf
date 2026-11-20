@@ -76,13 +76,13 @@ variable "private_subnets" {
 }
 
 variable "nat_gateway_mode" {
-  description = "NAT gateway availability mode: None, Zonal, or Regional."
+  description = "NAT gateway availability mode: None or Zonal."
   type        = string
   default     = "None"
 
   validation {
-    condition     = contains(["None", "Zonal", "Regional"], var.nat_gateway_mode)
-    error_message = "nat_gateway_mode must be None, Zonal, or Regional."
+    condition     = contains(["None", "Zonal"], var.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be None or Zonal."
   }
 }
 
