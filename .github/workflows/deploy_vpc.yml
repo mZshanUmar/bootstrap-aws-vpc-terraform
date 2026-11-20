@@ -3,14 +3,6 @@ name: Deploy VPC
 on:
   workflow_dispatch:
     inputs:
-      deployment_action:
-        required: true
-        type: choice
-        options:
-          - plan
-          - apply
-        default: plan
-        description: Just plan or apply as well (Apply will create/update/destroy resources)
       s3_state_bucket:
         required: true
         type: string
@@ -86,7 +78,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: terraform ${{ inputs.deployment_action }}
+    name: Apply VPC
     runs-on: ubuntu-latest
     env:
       AWS_OIDC_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
@@ -177,41 +169,13 @@ jobs:
       - name: Plan Terraform changes
         run: terraform plan -input=false -out=tfplan
 
-      - name: Add plan summary to deployment summary
-        shell: bash
-        env:
-          DEPLOYMENT_ACTION: ${{ inputs.deployment_action }}
-        run: |
-          set -euo pipefail
-          {
-            echo "## Terraform plan summary"
-            echo
-            echo "- **Requested action:** ${DEPLOYMENT_ACTION}"
-            echo "- **VPC:** ${VPC_NAME}"
-            echo "- **AWS region:** ${AWS_REGION}"
-            echo
-            terraform show -json tfplan | jq -r '
-              (.resource_changes // []) as $changes |
-              {
-                add: ([$changes[] | select(.change.actions == ["create"])] | length),
-                change: ([$changes[] | select(.change.actions == ["update"])] | length),
-                destroy: ([$changes[] | select(.change.actions == ["delete"])] | length),
-                replace: ([$changes[] | select((.change.actions | index("create")) and (.change.actions | index("delete")))] | length)
-              } |
-              "| Change | Resources |\n| --- | ---: |\n| Add | \(.add) |\n| Change in place | \(.change) |\n| Replace | \(.replace) |\n| Destroy | \(.destroy) |"
-            '
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Apply Terraform changes
-        if: inputs.deployment_action == 'apply'
         run: terraform apply -input=false tfplan
 
       - name: Show Terraform outputs
-        if: inputs.deployment_action == 'apply'
         run: terraform output
 
       - name: Add Terraform outputs to deployment summary
-        if: inputs.deployment_action == 'apply'
         shell: bash
         run: |
           set -euo pipefail

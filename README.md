@@ -115,12 +115,11 @@ route table IDs.
 ## Deploy with GitHub Actions
 
 The **Deploy VPC** workflow is manually triggered from the repository's
-**Actions** tab using **Run workflow**. Choose `plan` to review changes without
-applying them, or `apply` to create/update the VPC. The workflow saves the
-Terraform plan and applies that exact saved plan when `apply` is selected. A
-concise summary of planned additions, in-place changes, replacements, and
-deletions is added to the run's deployment summary. Every Terraform variable is
-provided as a workflow input. Subnets and tags are entered as JSON objects, and
+**Actions** tab using **Run workflow**. Each run creates a Terraform plan and
+immediately applies that exact saved plan. There is no plan-only option, and
+plan details are not added to the deployment summary; Terraform outputs are
+shown there after apply. Every Terraform variable is provided as a workflow
+input. Subnets and tags are entered as JSON objects, and
 `zonal_nat_gateway_availability_zones` accepts a JSON array, for example:
 
 ```json
@@ -137,9 +136,9 @@ AZ, or `["us-east-1a"]` to create one only in `us-east-1a`. Use `[]` for no
 Zonal NAT gateways. Private subnets in unlisted AZs will not have a NAT route.
 Every AZ in a non-empty list must have both public and private subnets.
 
-Set either subnet input to `{}` to omit that subnet type. The `apply` action uses
-the same workflow job as `plan`; choose `apply` only when you intend Terraform
-to create or update infrastructure.
+Set either subnet input to `{}` to omit that subnet type. Running this workflow
+will apply the requested configuration, including creating, updating, or
+destroying resources as required by Terraform.
 
 Choose `None`, `Zonal`, or `Regional` for the NAT gateway mode. NAT gateways
 can incur significant charges; `None` is the default.
