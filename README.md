@@ -11,9 +11,11 @@ when no public subnets are configured.
 - AWS credentials configured for the account where you want to create resources
 - Availability zones valid for the selected AWS region
 
-## Configure
+## Configuration
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and edit the values:
+### Example configuration
+
+Copy `terraform.tfvars.example` to `terraform.tfvars`, then edit the values:
 
 ```hcl
 aws_region = "us-east-1"
@@ -86,13 +88,17 @@ tags = {
 - `tags`: Extra tags applied to resources. The configuration also adds
   `Project` and resource-specific `Name` and `Tier` tags.
 
+### Default topology
+
 The defaults create one public subnet and two private subnets in separate
 Availability Zones, with NAT disabled. The public subnet and private subnet in
 `us-east-1a` use different CIDR ranges. See
 [`terraform.tfvars.example`](./terraform.tfvars.example) for an annotated,
 ready-to-copy configuration.
 
-## Deploy
+## Local deployment
+
+### Initialize the S3 backend
 
 ```sh
 terraform init \
@@ -101,25 +107,40 @@ terraform init \
   -backend-config="region=us-east-1" \
   -backend-config="encrypt=true" \
   -backend-config="use_lockfile=true"
+```
+
+The bucket must already exist. For GitHub Actions, provide the bucket and
+optional key prefix as workflow inputs; the workflow uses `terraform.tfstate`
+as the state file name.
+
+### Apply the configuration
+
+After initializing the backend, plan and apply the configuration:
+
+```sh
 terraform plan
 terraform apply
 ```
 
-An existing S3 bucket is required for the backend. The workflow accepts the
-bucket and an optional key prefix; it always uses `terraform.tfstate` as the
-state file name.
+### Outputs
 
 Terraform outputs the VPC ID, optional internet gateway ID, subnet IDs, and
 route table IDs.
 
-## Deploy with GitHub Actions
+## GitHub Actions deployment
+
+### Workflow behavior
 
 The **Deploy VPC** workflow is manually triggered from the repository's
 **Actions** tab using **Run workflow**. Each run creates a Terraform plan and
 immediately applies that exact saved plan. There is no plan-only option, and
 plan details are not added to the deployment summary; Terraform outputs are
-shown there after apply. Every Terraform variable is provided as a workflow
-input. Subnets and tags are entered as JSON objects, and
+shown there after apply.
+
+### Workflow inputs
+
+Every Terraform variable is provided as a workflow input. Subnets and tags are
+entered as JSON objects, and
 `zonal_nat_gateway_availability_zones` accepts a JSON array, for example:
 
 ```json
@@ -155,6 +176,8 @@ prefix empty to store `terraform.tfstate` at the bucket root. The bucket must
 already exist; the backend region is the selected AWS region. The workflow
 enables S3 encryption and native state locking. Enable bucket versioning for
 recovery.
+
+### GitHub Actions OIDC permissions
 
 Configure the repository Actions secret `AWS_ROLE_ARN` with an IAM role ARN
 trusted for GitHub Actions OIDC. For S3 state, grant the role the necessary
